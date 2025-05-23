@@ -1,0 +1,36 @@
+{
+  "name": "@toprak/run",
+  "version": "0.1.0",
+  "description": "🔥 Zero-config UI starter kit with TailwindCSS + Eleventy + Vanilla JS/TS",
+  "bin": {
+    "toprak-run": "./bin/toprak-run.js"
+  },
+  "keywords": [
+    "starter",
+    "ui",
+    "tailwind",
+    "eleventy",
+    "vanilla-js",
+    "toprak",
+    "minimal",
+    "build-app",
+    "npx"
+  ],
+  "author": "Uğur Toprakdeviren",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/toprakdeviren/toprak-run"
+  },
+  "type": "module",
+  "files": [
+    "bin/",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
