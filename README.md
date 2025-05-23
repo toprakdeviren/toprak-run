@@ -1,4 +1,4 @@
-# @toprak/run
+# @toprakdeviren/run
 
 🔥 **Zero-config UI starter kit** with TailwindCSS + Eleventy + Vanilla JS/TS
 
@@ -19,10 +19,10 @@ A modern, lightning-fast project generator that builds beautiful web projects in
 
 ```bash
 # Using npx (recommended)
-npx @toprak/run my-project
+npx @toprakdeviren/run my-project
 
 # Or install globally
-npm install -g @toprak/run
+npm install -g @toprakdeviren/run
 toprak-run my-project
 ```
 
@@ -91,13 +91,13 @@ npm run build:html   # Build HTML
 
 ```bash
 # Build a TypeScript project with TailwindCSS
-npx @toprak/run my-app
+npx @toprakdeviren/run my-app
 
 # Build with verbose output
-npx @toprak/run my-app --verbose
+npx @toprakdeviren/run my-app --verbose
 
 # Skip interactive prompts (use defaults)
-npx @toprak/run my-app --yes
+npx @toprakdeviren/run my-app --yes
 ```
 
 ## 🎨 CSS Frameworks
@@ -139,7 +139,7 @@ MIT © [Uğur Toprakdeviren](https://github.com/toprakdeviren)
 ## 🔗 Links
 
 - [GitHub Repository](https://github.com/toprakdeviren/toprak-run)
-- [npm Package](https://www.npmjs.com/package/@toprak/run)
+- [npm Package](https://www.npmjs.com/package/@toprakdeviren/run)
 - [Issues & Bug Reports](https://github.com/toprakdeviren/toprak-run/issues)
 
 ---
