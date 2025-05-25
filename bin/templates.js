@@ -34,6 +34,7 @@ function createPlaceholders(config, pm) {
     '{{PROJECT_DESCRIPTION}}': `Modern web project built with @toprak/run`,
     '{{USE_TYPESCRIPT}}': config.useTypeScript ? '✅' : '❌',
     '{{CSS_FRAMEWORK}}': cssFrameworks[config.cssFramework].name,
+    '{{TEMPLATE_FORMAT}}': config.useMarkdown ? 'Markdown' : 'HTML',
     '{{GIT_INIT}}': config.git.init ? '✅' : '❌',
     '{{PACKAGE_MANAGER}}': pm.cmd
   };
@@ -65,7 +66,6 @@ function readTemplate(templatePath) {
 
 function generateAllFiles(targetDir, config) {
   const files = {
-    'src/index.html': readTemplate('html/index.html'),
     'src/scripts/main.js': readTemplate('js/main.js'),
     'src/scripts/main.ts': readTemplate('ts/main.ts'),
     'src/styles/plain.css': readTemplate('css/plain.css'),
@@ -77,6 +77,12 @@ function generateAllFiles(targetDir, config) {
     '.eleventy.js': readTemplate('config/eleventy.js')
   };
 
+  // HTML template files
+  files['src/index.html'] = readTemplate('html/index.html');
+  files['src/index.md'] = readTemplate('html/index.md');
+  files['src/_includes/layout.html'] = readTemplate('html/_includes/layout.html');
+  files['src/_includes/hero.html'] = readTemplate('html/_includes/hero.html');
+
   // Add Tailwind config files if needed
   if (config.cssFramework === 'tailwind') {
     files['config/tailwind.config.js'] = readTemplate('config/tailwind.config.js');
@@ -84,7 +90,10 @@ function generateAllFiles(targetDir, config) {
   }
 
   Object.entries(files).forEach(([filePath, content]) => {
-    writeFileSync(join(targetDir, filePath), content);
+    const fullPath = join(targetDir, filePath);
+    // Create directory if it doesn't exist
+    mkdirSync(dirname(fullPath), { recursive: true });
+    writeFileSync(fullPath, content);
   });
 }
 
@@ -118,6 +127,13 @@ function cleanupFiles(targetDir, config) {
     } else {
       safeUnlink(join(targetDir, 'src/scripts/main.ts'));
       safeUnlink(join(targetDir, 'tsconfig.json'));
+    }
+
+    // Handle template format - keep either HTML or Markdown
+    if (config.useMarkdown) {
+      safeUnlink(join(targetDir, 'src/index.html'));
+    } else {
+      safeUnlink(join(targetDir, 'src/index.md'));
     }
 
     // Handle CSS framework-specific files

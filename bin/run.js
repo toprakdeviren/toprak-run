@@ -129,6 +129,12 @@ const configCollector = {
         );
         const cssFramework = Object.keys(CONFIG.cssFrameworks)[cssChoice === 'TailwindCSS (recommended)' ? 0 : 1];
 
+        const templateFormat = await cli.askChoice(
+            '📝 Choose template format:',
+            ['HTML (recommended)', 'Markdown']
+        );
+        const useMarkdown = templateFormat === 'Markdown';
+
         const initGit = await cli.askYesNo('📦 Initialize Git repository?');
         let gitRemote = '';
         if (initGit) {
@@ -139,6 +145,7 @@ const configCollector = {
             projectName,
             useTypeScript,
             cssFramework,
+            useMarkdown,
             git: {
                 init: initGit,
                 remote: gitRemote.trim()
@@ -151,6 +158,7 @@ const configCollector = {
         logger.info(`   ⚡ Project: ${config.projectName}`);
         logger.info(`   🔷 TypeScript: ${config.useTypeScript ? '✅' : '❌'}`);
         logger.info(`   🎨 CSS: ${CONFIG.cssFrameworks[config.cssFramework].name}`);
+        logger.info(`   📝 Template: ${config.useMarkdown ? 'Markdown' : 'HTML'}`);
         logger.info(`   📦 Git: ${config.git.init ? '✅' : '❌'}`);
 
         return cli.askYesNo('\n🚀 Build project?');
