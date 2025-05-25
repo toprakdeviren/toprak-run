@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "🔥 Zero-config UI starter kit with TailwindCSS + Eleventy + Vanilla JS/TS",
   "bin": {
-    "toprak-run": "./bin/toprak-run.js"
+    "run": "./bin/run.js"
   },
   "keywords": [
     "starter",
