@@ -15,12 +15,29 @@ const CONFIG = {
     }
 };
 
-// Logging utility
-function log(message) {
-    if (CONFIG.isVerbose) {
+// Logger utility
+const logger = {
+    log(message) {
+        if (CONFIG.isVerbose) {
+            console.log(message);
+        }
+    },
+    info(message) {
         console.log(message);
+    },
+    error(message, error) {
+        console.error(message);
+        if (CONFIG.isVerbose && error) {
+            console.error(error);
+        }
+    },
+    warn(message) {
+        console.log(`⚠️  ${message}`);
+    },
+    success(message) {
+        console.log(`✅ ${message}`);
     }
-}
+};
 
 // CLI interaction module
 const cli = {
@@ -80,57 +97,68 @@ const systemUtils = {
             return true;
         } catch (error) {
             if (CONFIG.isVerbose) {
-                console.error(`Command failed: ${command}`);
-                console.error(error);
+                logger.error(`Command failed: ${command}`, error);
             }
             return false;
         }
     }
 };
 
-// Project configuration collector
-async function collectProjectConfig() {
-    console.log('🚀 Welcome to @toprak/run v0.1');
-    console.log('Build a modern web project in seconds!\n');
+// Configuration collector
+const configCollector = {
+    async collect() {
+        logger.info('🚀 Welcome to @toprak/run v0.1');
+        logger.info('Build a modern web project in seconds!\n');
 
-    // Get project name
-    let projectName = process.argv[2];
-    if (!projectName) {
-        projectName = await cli.askQuestion('📝 Project name: ');
+        // Get project name
+        let projectName = process.argv[2];
         if (!projectName) {
-            console.error('❌ Project name is required');
-            process.exit(1);
+            projectName = await cli.askQuestion('📝 Project name: ');
+            if (!projectName) {
+                logger.error('❌ Project name is required');
+                process.exit(1);
+            }
         }
-    }
 
-    const useTypeScript = await cli.askYesNo('🔷 Use TypeScript?');
+        const useTypeScript = await cli.askYesNo('🔷 Use TypeScript?');
+        
+        const cssChoice = await cli.askChoice(
+            '🎨 Choose CSS framework:',
+            Object.entries(CONFIG.cssFrameworks).map(([key, value]) => 
+                `${value.name} ${key === 'tailwind' ? '(recommended)' : ''}`)
+        );
+        const cssFramework = Object.keys(CONFIG.cssFrameworks)[cssChoice === 'TailwindCSS (recommended)' ? 0 : 1];
+
+        const initGit = await cli.askYesNo('📦 Initialize Git repository?');
+        let gitRemote = '';
+        if (initGit) {
+            gitRemote = await cli.askQuestion('🌐 Git remote URL (optional, press Enter to skip): ');
+        }
+
+        return {
+            projectName,
+            useTypeScript,
+            cssFramework,
+            git: {
+                init: initGit,
+                remote: gitRemote.trim()
+            }
+        };
+    },
     
-    const cssChoice = await cli.askChoice(
-        '🎨 Choose CSS framework:',
-        Object.entries(CONFIG.cssFrameworks).map(([key, value]) => 
-            `${value.name} ${key === 'tailwind' ? '(recommended)' : ''}`)
-    );
-    const cssFramework = Object.keys(CONFIG.cssFrameworks)[cssChoice === 'TailwindCSS (recommended)' ? 0 : 1];
+    async confirm(config) {
+        logger.info('\n📋 Configuration:');
+        logger.info(`   ⚡ Project: ${config.projectName}`);
+        logger.info(`   🔷 TypeScript: ${config.useTypeScript ? '✅' : '❌'}`);
+        logger.info(`   🎨 CSS: ${CONFIG.cssFrameworks[config.cssFramework].name}`);
+        logger.info(`   📦 Git: ${config.git.init ? '✅' : '❌'}`);
 
-    const initGit = await cli.askYesNo('📦 Initialize Git repository?');
-    let gitRemote = '';
-    if (initGit) {
-        gitRemote = await cli.askQuestion('🌐 Git remote URL (optional, press Enter to skip): ');
+        return cli.askYesNo('\n🚀 Build project?');
     }
+};
 
-    return {
-        projectName,
-        useTypeScript,
-        cssFramework,
-        git: {
-            init: initGit,
-            remote: gitRemote.trim()
-        }
-    };
-}
-
-// Project builder module
-const projectBuilder = {
+// Package manager operations
+const packageManager = {
     async generatePackageJson(config, pm) {
         const { projectName, useTypeScript, cssFramework } = config;
 
@@ -158,7 +186,7 @@ shamefully-hoist=true`);
     async installDependencies(config, pm) {
         const { useTypeScript, cssFramework } = config;
 
-        log("Installing base dependencies...");
+        logger.log("Installing base dependencies...");
         let deps = `@11ty/eleventy @11ty/eleventy-plugin-bundle postcss autoprefixer esbuild concurrently html-minifier-terser cssnano postcss-cli`;
 
         if (cssFramework === 'tailwind') {
@@ -178,41 +206,45 @@ shamefully-hoist=true`);
             systemUtils.execCommand(installCmd);
         }
 
-        log("Dependencies installed successfully");
+        logger.log("Dependencies installed successfully");
     },
 
     async setupScripts(config, pm) {
         const { useTypeScript, cssFramework } = config;
 
-        // HTML build - Eleventy ile build yap, sonra minify et
+        // HTML build
         systemUtils.execCommand(`${pm.cmd} pkg set scripts['build:html']='eleventy && html-minifier-terser --input-dir dist --output-dir dist --file-ext html --collapse-whitespace --remove-comments --remove-optional-tags --remove-redundant-attributes --remove-script-type-attributes --remove-tag-whitespace --use-short-doctype --minify-css true --minify-js true'`);
 
+        // CSS build
         if (cssFramework === 'tailwind') {
-            // TailwindCSS build et ve minify et
             systemUtils.execCommand(`${pm.cmd} pkg set scripts['build:css']='tailwindcss -i ./src/styles/input.css -o ./dist/style.css --config ./config/tailwind.config.js && postcss ./dist/style.css --use cssnano --output ./dist/style.css'`);
         } else {
-            // Plain CSS'i kopyala ve minify et
             systemUtils.execCommand(`${pm.cmd} pkg set scripts['build:css']='cp ./src/styles/input.css ./dist/style.css && postcss ./dist/style.css --use cssnano --output ./dist/style.css'`);
         }
 
+        // JS/TS build
         if (useTypeScript) {
             systemUtils.execCommand(`${pm.cmd} pkg set scripts['build:js']='esbuild src/scripts/main.ts --bundle --outfile=dist/bundle.js --minify --loader:.ts=ts'`);
         } else {
             systemUtils.execCommand(`${pm.cmd} pkg set scripts['build:js']='esbuild src/scripts/main.js --bundle --outfile=dist/bundle.js --minify'`);
         }
 
+        // Main scripts
         systemUtils.execCommand(`${pm.cmd} pkg set scripts.build='${pm.cmd} run build:css && ${pm.cmd} run build:js && ${pm.cmd} run build:html'`);
         systemUtils.execCommand(`${pm.cmd} pkg set scripts.dev='concurrently "${pm.cmd} run build:css --watch" "${pm.cmd} run build:js --watch" "eleventy --serve --watch"'`);
-    },
+    }
+};
 
-    async initializeGit(config) {
+// Git operations
+const gitManager = {
+    async initialize(config) {
         const { git, projectName } = config;
 
         try {
-            log("📦 Initializing Git repository...");
+            logger.log("📦 Initializing Git repository...");
 
             if (!systemUtils.execCommand('git --version', true)) {
-                console.log("⚠️  Git not found. Initialize manually with: git init");
+                logger.warn("Git not found. Initialize manually with: git init");
                 return;
             }
 
@@ -221,91 +253,94 @@ shamefully-hoist=true`);
             systemUtils.execCommand(`git commit -m "🎉 Initial commit: ${projectName} built with @toprak/run"`);
 
             if (git.remote) {
-                log("🌐 Adding remote repository...");
+                logger.log("🌐 Adding remote repository...");
                 if (systemUtils.execCommand(`git remote add origin ${git.remote}`)) {
                     const shouldPush = await cli.askYesNo('🚀 Push to remote repository?');
                     if (shouldPush) {
                         if (systemUtils.execCommand('git branch -M main') && 
                                 systemUtils.execCommand('git push -u origin main')) {
-                            log("✅ Code pushed to remote repository");
+                            logger.log("✅ Code pushed to remote repository");
                         } else {
-                            console.log("⚠️  Failed to push to remote. Push manually with:");
-                            console.log("   git branch -M main && git push -u origin main");
+                            logger.warn("Failed to push to remote. Push manually with:");
+                            logger.info("   git branch -M main && git push -u origin main");
                         }
                     }
                 } else {
-                    console.log("⚠️  Failed to add remote. Add manually with:");
-                    console.log(`   git remote add origin ${git.remote}`);
+                    logger.warn("Failed to add remote. Add manually with:");
+                    logger.info(`   git remote add origin ${git.remote}`);
                 }
             }
 
-            log("✅ Git repository initialized successfully");
+            logger.success("Git repository initialized successfully");
         } catch (error) {
-            console.log("⚠️  Git initialization failed. Initialize manually with: git init");
-            if (CONFIG.isVerbose) console.error(error);
+            logger.warn("Git initialization failed. Initialize manually with: git init");
+            if (CONFIG.isVerbose) logger.error(error);
         }
     }
 };
 
-async function buildProject(config) {
-    const { projectName } = config;
-    const root = resolve(process.cwd(), projectName);
-    const pm = systemUtils.detectPackageManager();
+// Project builder
+const projectBuilder = {
+    async build(config) {
+        const { projectName } = config;
+        const root = resolve(process.cwd(), projectName);
+        const pm = systemUtils.detectPackageManager();
 
-    console.log(`\n🚀 Building project: ${projectName}`);
-    log(`📦 Detected ${pm.cmd.toUpperCase()}`);
+        logger.info(`\n🚀 Building project: ${projectName}`);
+        logger.log(`📦 Detected ${pm.cmd.toUpperCase()}`);
 
-    mkdirSync(root, { recursive: true });
-    process.chdir(root);
+        mkdirSync(root, { recursive: true });
+        process.chdir(root);
 
-    log("📁 Generating template files...");
-    await generateTemplate(config, root, pm);
+        logger.log("📁 Generating template files...");
+        await generateTemplate(config, root, pm);
 
-    log("📦 Generating package.json...");
-    await projectBuilder.generatePackageJson(config, pm);
+        logger.log("📦 Generating package.json...");
+        await packageManager.generatePackageJson(config, pm);
 
-    log("🔧 Installing dependencies...");
-    await projectBuilder.installDependencies(config, pm);
+        logger.log("🔧 Installing dependencies...");
+        await packageManager.installDependencies(config, pm);
 
-    log("📝 Setting up scripts...");
-    await projectBuilder.setupScripts(config, pm);
+        logger.log("📝 Setting up scripts...");
+        await packageManager.setupScripts(config, pm);
 
-    // Initialize Git repository
-    if (config.git.init) {
-        await projectBuilder.initializeGit(config);
+        // Initialize Git repository
+        if (config.git.init) {
+            await gitManager.initialize(config);
+        }
+
+        this.showFinalInstructions(config, pm);
+    },
+
+    showFinalInstructions(config, pm) {
+        logger.info("\n✅ Project is ready!");
+        logger.info(`👉 cd ${config.projectName}`);
+        logger.info(`👉 ${pm.cmd} run dev`);
+
+        if (config.git.init && config.git.remote) {
+            logger.info(`\n📦 Git repository: ${config.git.remote}`);
+        }
+
+        logger.info(`\n✨ Happy coding with @toprak/run ✨`);
     }
-
-    console.log("\n✅ Project is ready!");
-    console.log(`👉 cd ${projectName}`);
-    console.log(`👉 ${pm.cmd} run dev`);
-
-    if (config.git.init && config.git.remote) {
-        console.log(`\n📦 Git repository: ${config.git.remote}`);
-    }
-
-    console.log(`\n✨ Happy coding with @toprak/run ✨`);
-}
+};
 
 // Main function
 async function main() {
     try {
-        const config = await collectProjectConfig();
+        // Collect and confirm configuration
+        const config = await configCollector.collect();
+        const proceed = await configCollector.confirm(config);
         
-        console.log('\n📋 Configuration:');
-        console.log(`   ⚡ Project: ${config.projectName}`);
-        console.log(`   🔷 TypeScript: ${config.useTypeScript ? '✅' : '❌'}`);
-        console.log(`   🎨 CSS: ${CONFIG.cssFrameworks[config.cssFramework].name}`);
-        console.log(`   📦 Git: ${config.git.init ? '✅' : '❌'}`);
-
-        const proceed = await cli.askYesNo('\n🚀 Build project?');
         if (!proceed) {
-            console.log('❌ Cancelled');
+            logger.info('❌ Cancelled');
             process.exit(0);
         }
 
-        await buildProject(config);
+        // Build the project
+        await projectBuilder.build(config);
     } catch (error) {
-        console.error('An error occurred:', error);
+        logger.error('An error occurred:', error);
         process.exit(1);
     }
 }
